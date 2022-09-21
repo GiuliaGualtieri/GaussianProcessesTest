@@ -146,7 +146,7 @@ using ForwardDiff
 
 # set the number of samples to draw and warmup iterations
 
-n_samples = 4_000
+n_samples = 2_000
 n_adapts = 1_000
 
 # define a hamiltonian system of the log joint probability.
@@ -273,25 +273,29 @@ end
 # DynamicHMC. Again we use [ForwardDiff.jl](https://github.com/JuliaDiff/ForwardDiff.jl)
 # to compute the derivatives of the log joint density with automatic differentiation.
 
-samples =
-    mcmc_with_warmup(
+samples = mcmc_with_warmup(
         Random.GLOBAL_RNG,
-        ADgradient(:ForwardDiff, loglik_train),
+        ADgradient(Val(:ForwardDiff), loglik_train),
         n_samples;
         reporter=NoProgressReport(),
-    ).chain
+    ).posterior_matrix
+# typeof(samples) -> NamedTuple of posterior.
+#= the output of this NamedTuple 
+are :posterior_matrix, :tree_statistics, :κ, :ϵ
+=#
 
 # We transform the samples back to the constrained space and compute the mean of both
 # parameters:
 
 samples_constrained = [map(softplus, p) for p in samples]
-mean_samples = mean(samples_constrained)
+mean_samples = vcat(mean(samples_constrained[1,:]),mean(samples_constrained[2,:]))
+# mean(samples_constrained)
 
 # We plot a histogram of the samples for the two parameters.
 # The vertical line in each graph indicates the mean of the samples.
 
 histogram(
-    reduce(hcat, samples_constrained)';
+    samples_constrained',# reduce(hcat, samples_constrained)';
     xlabel="sample",
     ylabel="counts",
     layout=2,
@@ -304,7 +308,8 @@ vline!(mean_samples'; linewidth=2)
 # of the test data with respect to the posterior Gaussian process with default kernel
 # parameters.
 
-mean(logpdf(gp_posterior(x_train, y_train, p)(x_test), y_test) for p in samples)
+mean(logpdf(gp_posterior(x_train, y_train, samples[:,p])(x_test), y_test) for p in 1:2000)
+# -7.332676578775303
 
 # We sample a function from the posterior GP for the final 100 samples of kernel
 # parameters.
@@ -312,8 +317,8 @@ mean(logpdf(gp_posterior(x_train, y_train, p)(x_test), y_test) for p in samples)
 plt = plot(; xlim=(0, 1), xlabel="x", ylabel="y", title="posterior (DynamicHMC)")
 scatter!(plt, x_train, y_train; label="Train Data")
 scatter!(plt, x_test, y_test; label="Test Data")
-for p in samples[(end - 100):end]
-    sampleplot!(plt, 0:0.02:1, gp_posterior(x_train, y_train, p); seriescolor="red")
+for p in 1:100
+    sampleplot!(plt, 0:0.02:1, gp_posterior(x_train, y_train, samples[:,(end - p):end]); seriescolor="red")
 end
 plt
 
