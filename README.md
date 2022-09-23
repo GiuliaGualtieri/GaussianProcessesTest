@@ -1,2 +1,2 @@
 # GaussianProcessesTest
-Repository to practice GPs using Julia programming language.
+Repository to practice GPs using Julia's programming language.
